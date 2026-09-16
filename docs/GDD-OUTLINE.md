@@ -6,7 +6,7 @@
 > repo shows the shape of the design work without exposing internal material.
 > Each `[SLOT]` below will be filled with a sanitized public summary as milestones land.
 
-**Project:** Cyber Wolf Dash · **Engine:** Godot 4.x · **Status:** PRE-PRODUCTION
+**Project:** Cyber Wolf Dash · **Engine:** ZERO-DEPENDENCY HTML5 (Canvas 2D + WebAudio) — no engine, no build step · **Status:** PRE-PRODUCTION
 **Owner (design):** Sarah · **Reviewer:** CIPHER2-GD · **Direction:** Sophia
 
 ---
@@ -44,7 +44,7 @@ Front-end flow, settings, stats (attempts, best %), achievements, daily-challeng
 considerations.
 
 ## 9. Technical Architecture `[SLOT]`
-Godot 4.x scene structure, node conventions, save format for editor levels,
+Level format: JSON beat-quantized tiles (editor v1.1), browser localStorage for saves,
 porting targets. *(Internal tech brief referenced; public notes TBD.)*
 
 ## 10. Monetization & Market `[SLOT]`

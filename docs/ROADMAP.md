@@ -9,9 +9,9 @@
 ---
 
 ## Phase 1 — Foundation (W1–W4) ⬜
-- [ ] **W1** — Repo scaffold (this commit); Godot 4.x project skeleton; repo conventions
-- [ ] **W2** — Core movement prototype: runner physics, input buffering, frame-tuned jump
-- [ ] **W3** — Beat-sync foundation: BPM clock, obstacle-on-beat placement API
+- [ ] **W1** — Repo scaffold (this commit); HTML5 zero-dependency stack decision (delivered in v0.1 HOWL); repo conventions
+- [x] **W2** — DELIVERED in v0.1: runner physics, input buffering, coyote time, variable jump
+- [x] **W3 (partial)** — DELIVERED in v0.1: 130 BPM WebAudio clock, on-beat pulse, obstacle pacing by density
 - [ ] **W4** — **Prototype level gate:** one playable test level proving rhythm-sync feel
   - *Gate: movement + rhythm sync feel signed off by CIPHER2-GD*
 
