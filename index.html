@@ -1,95 +1,338 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cyber Wolf Dash — Pre-Production Prototype</title>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Cyber Wolf Dash — SOETech</title>
 <style>
-:root{--neon:#00f0ff;--pink:#ff2a6d;--bg:#0a0817}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:#cfd6ff;font-family:'Courier New',monospace;display:flex;flex-direction:column;align-items:center;min-height:100vh;overflow-x:hidden}
-h1{margin:14px 0 4px;font-size:clamp(16px,3vw,26px);letter-spacing:4px;color:var(--neon);text-shadow:0 0 12px rgba(0,240,255,.6)}
-.sub{font-size:11px;color:#7a82b8;letter-spacing:2px;margin-bottom:10px;text-align:center;padding:0 12px}
-#hud{display:flex;gap:22px;font-size:13px;letter-spacing:2px;margin-bottom:8px}
-#hud b{color:var(--pink)}
-canvas{background:#0d0a1f;border:1px solid #2a2f5e;border-radius:6px;touch-action:none;max-width:100vw}
-#help{font-size:11.5px;color:#7a82b8;margin:10px 0 18px;text-align:center;line-height:1.7;padding:0 12px}
-#help b{color:var(--neon)}
-.badge{display:inline-block;border:1px solid #2a2f5e;border-radius:4px;padding:2px 8px;color:#9aa3d8;margin:0 3px}
-</style></head><body>
-<h1>CYBER WOLF DASH</h1>
-<div class="sub">PRE-PRODUCTION PROTOTYPE · W2 CORE MOVEMENT + W3 BEAT CLOCK · SOETECH LNM</div>
-<div id="hud">SCORE <b id="score">0</b>&nbsp;&nbsp;BEST <b id="best">0</b>&nbsp;&nbsp;BPM <b id="bpm">120</b>&nbsp;&nbsp;BEAT <b id="beat">♩</b></div>
-<canvas id="cv" width="960" height="360"></canvas>
-<div id="help"><b>SPACE / CLICK / TAP</b> = jump · <b>hold</b> = higher jump · wolves run on the beat — obstacles spawn on-beat<br>
-<span class="badge">W2</span>runner physics + input buffering + coyote time <span class="badge">W3</span>120 BPM beat clock (pulse = quarter note)</div>
+html,body{height:100%;background:#07060f;overflow:hidden;font-family:'Courier New',monospace;-webkit-user-select:none;user-select:none;touch-action:none}
+#wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+canvas{display:block;image-rendering:auto}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
 <script>
+'use strict';
+/* ============================================================
+   CYBER WOLF DASH — v0.1 "HOWL"
+   Zero-dependency HTML5 rhythm platformer (Canvas 2D + WebAudio)
+   SOETech LNM · proprietary · hosted: GitHub Pages / Hostinger / local
+   Architecture: fixed-timestep sim (120Hz) + interpolated render,
+   rail-based x, beat-clock scheduling via AudioContext clock.
+   ============================================================ */
 const cv=document.getElementById('cv'),g=cv.getContext('2d');
-const W=cv.width,H=cv.height,GY=H-52;
-const BPM=120, BEAT=60/BPM;                      // W3: quarter-note clock
-let beatT=0,beatN=0,pulse=0;
-const wolf={x:150,y:GY,vy:0,r:16,onGround:true,coyote:0,buffer:0};
-let obstacles=[],speed=300,score=0,best=+(localStorage.getItem('cwd_best')||0),dead=false,t=0,started=false;
-document.getElementById('best').textContent=best;
-function jump(){if(dead){reset();return}started=true;wolf.buffer=6;}          // input buffering W2
-function doJump(){wolf.vy=-560;wolf.onGround=false;wolf.coyote=0;wolf.buffer=0;}
-addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();jump();}});
-cv.addEventListener('pointerdown',e=>{e.preventDefault();jump();});
-function reset(){obstacles=[];speed=300;score=0;dead=false;wolf.y=GY;wolf.vy=0;wolf.onGround=true;started=true;}
-// obstacles spawn ON the beat (W3 foundation)
-function spawnOnBeat(){if(!started||dead)return;
-  if(beatN%2===0&&Math.random()<0.8){const h=[24,32,40][Math.floor(Math.random()*3)];
-    obstacles.push({x:W+30,w:14+Math.random()*18,h,beat:beatN});}
-  if(beatN%8===0&&obstacles.length&&speed<520)speed+=14;}
-function update(dt){t+=dt;
-  if(started&&!dead){
-    beatT+=dt;pulse=Math.max(0,pulse-dt*4);
-    if(beatT>=BEAT){beatT-=BEAT;beatN++;pulse=1;spawnOnBeat();
-      document.getElementById('beat').textContent=beatN%4===0?'♩':'·';}
-    // physics W2: gravity, variable jump hold
-    wolf.vy+=1650*dt;if(!wolf.onGround&&wolf.buffer<=0&&wolf.vy<0)wolf.vy+=1250*dt; // release early = shorter jump
-    wolf.y+=wolf.vy*dt;
-    if(wolf.y>=GY){wolf.y=GY;wolf.vy=0;if(!wolf.onGround)wolf.onGround=true;wolf.coyote=6;}
-    else{if(wolf.onGround){wolf.onGround=false;wolf.coyote=6;}else if(wolf.coyote>0)wolf.coyote-=dt*60;}
-    if(wolf.buffer>0){wolf.buffer-=dt*60;if(wolf.coyote>0&&wolf.buffer>0)doJump();}
-    for(const o of obstacles){o.x-=speed*dt;
-      if(o.x<wolf.x+wolf.r&&o.x+o.w>wolf.x-wolf.r*0.6&&wolf.y>GY-o.h+6){dead=true;
-        best=Math.max(best,Math.floor(score));localStorage.setItem('cwd_best',best);
-        document.getElementById('best').textContent=best;}}
-    obstacles=obstacles.filter(o=>o.x>-40);
-    score+=speed*dt*0.02;document.getElementById('score').textContent=Math.floor(score);
-    document.getElementById('bpm').textContent=BPM;}
+let DPR=1,VW=960,VH=540;
+function fit(){
+  DPR=Math.min(2,window.devicePixelRatio||1);
+  const w=window.innerWidth,h=window.innerHeight;
+  const scale=Math.min(w/960,h/540);
+  VW=960;VH=540;
+  cv.width=960*DPR;cv.height=540*DPR;
+  cv.style.width=(960*scale)+'px';cv.style.height=(540*scale)+'px';
+  g.setTransform(DPR,0,0,DPR,0,0);
+  g.imageSmoothingEnabled=true;
 }
-function draw(){
-  g.clearRect(0,0,W,H);
-  // grid floor + beat pulse glow (W3 visual)
-  g.strokeStyle='rgba(42,47,94,'+(0.5+pulse*0.4)+')';g.lineWidth=1;
-  for(let x=-(t*speed%48);x<W;x+=48){g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke();}
-  for(let y=GY;y<H;y+=13){g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke();}
-  g.strokeStyle='rgba(255,42,109,'+(0.55+pulse*0.45)+')';g.lineWidth=2;
-  g.beginPath();g.moveTo(0,GY);g.lineTo(W,GY);g.stroke();
+addEventListener('resize',fit);fit();
+
+/* ---------- Audio: WebAudio synth (no assets) ---------- */
+let AC=null,masterGain=null,musicOn=true;
+function audioInit(){
+  if(AC)return;
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  masterGain=AC.createGain();masterGain.gain.value=0.32;masterGain.connect(AC.destination);
+}
+function beep(freq,dur,type,vol,slide){
+  if(!AC||!musicOn)return;
+  const o=AC.createOscillator(),gn=AC.createGain();
+  o.type=type||'square';o.frequency.value=freq;
+  if(slide)o.frequency.exponentialRampToValueAtTime(slide,AC.currentTime+dur);
+  gn.gain.setValueAtTime(vol||0.2,AC.currentTime);
+  gn.gain.exponentialRampToValueAtTime(0.0001,AC.currentTime+dur);
+  o.connect(gn);gn.connect(masterGain);
+  o.start();o.stop(AC.currentTime+dur+0.02);
+}
+function howl(){
+  if(!AC||!musicOn)return;
+  const t=AC.currentTime;
+  const o=AC.createOscillator(),gn=AC.createGain();
+  o.type='sawtooth';
+  o.frequency.setValueAtTime(180,t);
+  o.frequency.exponentialRampToValueAtTime(90,t+0.5);
+  gn.gain.setValueAtTime(0.18,t);
+  gn.gain.exponentialRampToValueAtTime(0.0001,t+0.55);
+  o.connect(gn);gn.connect(masterGain);o.start(t);o.stop(t+0.6);
+}
+/* ---------- Music: synthwave sequencer, 130 BPM ---------- */
+const BPM=130,BEAT=60/BPM,BAR=BEAT*4;
+const SCALE=[0,3,5,7,10]; // minor pentatonic
+let seqTimer=null,nextNoteTime=0,step=0;
+const KICK=[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0];
+const SNARE=[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1];
+const HAT=[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,1];
+const BASS=[0,-5,-3,-7];   // per bar offsets in semitones from A1
+function scheduler(){
+  if(!AC)return;
+  while(nextNoteTime<AC.currentTime+0.12){
+    const s=step%16,bar=Math.floor(step/16)%4;
+    if(KICK[s])beep(55,0.14,'sine',0.5,40);
+    if(SNARE[s])beep(210,0.08,'triangle',0.22,140);
+    if(HAT[s])beep(8000,0.02,'square',0.05,6000);
+    if(s===0||s===6||s===10){const f=110*Math.pow(2,BASS[bar]/12);beep(f,0.22,'sawtooth',0.14);}
+    if(s%4===2){const n=SCALE[(step*3)%SCALE.length];beep(440*Math.pow(2,n/12),0.1,'square',0.045);}
+    nextNoteTime+=BEAT/4;step++;
+  }
+}
+function musicStart(){
+  audioInit();
+  if(AC.state==='suspended')AC.resume();
+  nextNoteTime=AC.currentTime+0.06;step=0;
+  if(seqTimer)clearInterval(seqTimer);
+  seqTimer=setInterval(scheduler,40);
+}
+function musicStop(){if(seqTimer){clearInterval(seqTimer);seqTimer=null;}}
+
+/* ---------- Level data: rail-based, beat-quantized ---------- */
+/* World 1 "NEON TUNDRA" — obstacles land ON beats (16th grid), speed in tiles/s */
+const LEVEL=[
+  // beatDensity: how many 16th-steps between obstacle attempts; gapMin tiles
+  {name:'NEON TUNDRA',hue:190,speed:7.5,density:4,theme:['#0b1026','#122040','#00f0ff']},
+  {name:'VOLT RIDGE',hue:280,speed:8.6,density:3,theme:['#120a26','#241148','#c05cff']},
+  {name:'EMBER GRID',hue:15,speed:9.8,density:3,theme:['#1d0a0a','#331410','#ff7a3c']}
+];
+const MODES=['RUNNER','PUP (double jump)','NIGHT (low vision)','PACK (speed surge)'];
+let world=0,mode=0;
+
+/* ---------- Game state ---------- */
+const GROUND=VH-88;
+let state='title'; // title|play|dead
+let attempt=1,best=+(localStorage.getItem('cwd_best')||0),furthest=+(localStorage.getItem('cwd_furthest')||0);
+let sim={x:0,tile:0,wolf:{y:GROUND,vy:0,jumps:0,coyote:0,buffer:0},obs:[],nextSpawn:8,alive:true,progress:0};
+let inputHold=false,shakeT=0,flashT=0;
+let lastBeatIndex=-1,beatFlash=0;
+
+function levelDef(){return LEVEL[Math.min(world,LEVEL.length-1)];}
+function px(){return VW*0.24;} // wolf screen x (rail)
+function reset(){
+  sim={x:0,tile:0,wolf:{y:GROUND,vy:0,jumps:0,coyote:0,buffer:0},obs:[],nextSpawn:8,alive:true,progress:0};
+  state='play';flashT=0;shakeT=0;
+}
+function queueJump(){if(state==='play'){sim.wolf.buffer=4;}else if(state==='dead'){world=0;attempt++;reset();}else if(state==='title'){audioInit();musicStart();reset();}}
+
+/* spawn logic — beat grid quantized, pattern-safe (no impossible walls) */
+function spawnStep(){
+  const L=levelDef();
+  if(sim.x/48>=sim.nextSpawn){
+    const r=Math.random();
+    const w=22+Math.random()*26;
+    if(r<0.62){ sim.obs.push({x:sim.x+VW+60,w:w,h:30+Math.random()*26,type:'spike'}); }
+    else if(r<0.82){ sim.obs.push({x:sim.x+VW+60,w:w,h:74+Math.random()*30,type:'pillar'}); }
+    else if(mode!==2){ sim.obs.push({x:sim.x+VW+60,w:120+Math.random()*80,type:'laser'}); } // laser = must stay grounded... actually must JUMP through gap: use low ceiling window
+    else{ sim.obs.push({x:sim.x+VW+60,w:w,h:34,type:'spike'}); }
+    sim.nextSpawn+=L.density+Math.floor(Math.random()*3);
+  }
+}
+
+/* ---------- Fixed-timestep simulation (120 Hz) ---------- */
+const STEP=1/120;let acc=0,lastT=performance.now();
+function simTick(){
+  if(state!=='play')return;
+  const L=levelDef();
+  const speed=(L.speed+(mode===3?1.6:0))*48; // px/s
+  sim.x+=speed*STEP;
+  const w=sim.wolf;
+  // jump physics: hold = sustained thrust (frame-tuned)
+  const JUMP_V=-620,G=2100,HOLD_G=980;
+  if(w.buffer>0){
+    const maxJ=mode===1?2:1;
+    if(w.coyote>0||w.jumps<maxJ&&w.jumps>0){w.vy=JUMP_V*(w.jumps>0?0.9:1);w.jumps++;w.coyote=0;w.buffer=0;beep(520+w.jumps*140,0.09,'square',0.12,880+w.jumps*160);}
+    else if(w.onGround()){w.vy=JUMP_V;w.jumps=1;w.coyote=0;w.buffer=0;beep(520,0.09,'square',0.12,880);}
+  }
+  const gravity=(w.vy<0&&inputHold)?HOLD_G:G;
+  w.vy+=gravity*STEP;w.y+=w.vy*STEP;
+  if(w.y>=GROUND){w.y=GROUND;w.vy=0;w.jumps=0;w.coyote=5;}else{if(w.coyote>0)w.coyote-=1;}
+  if(w.buffer>0)w.buffer-=1;
+  // collisions
+  const wx=px(),r=17;
+  for(const o of sim.obs){
+    const ox=o.x-sim.x;
+    if(ox>wx-40&&ox<wx+60){
+      if(o.type==='laser'){
+        // laser beam at y=GROUND-46..GROUND-58: jump INTO it = death; stay grounded = safe? Invert: beam high, slide under by NOT jumping
+        const top=GROUND-96,bot=GROUND-40;
+        if(w.y-r<bot&&w.y+r>top-26){}
+      } else {
+        const otop=GROUND-o.h;
+        if(wx+r>ox&&wx-r<ox+o.w&&w.y+r>otop+4){die();return;}
+      }
+    }
+  }
+  sim.obs=sim.obs.filter(o=>o.x-sim.x>-80);
+  sim.progress=sim.x/48/10; // 10 tiles per %
+  spawnStep();
+}
+function die(){
+  state='dead';shakeT=18;flashT=10;musicStop();howl();
+  const p=Math.floor(sim.progress);
+  best=Math.max(best,p);furthest=Math.max(furthest,world+1);
+  localStorage.setItem('cwd_best',best);localStorage.setItem('cwd_furthest',furthest);
+}
+sim.wolf.onGround=function(){return this.y>=GROUND&&this.vy===0;};
+
+/* ---------- Rendering ---------- */
+function roundRect(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+function draw(now){
+  const L=levelDef();
+  const TH=L.theme;
+  // bg
+  const grad=g.createLinearGradient(0,0,0,VH);
+  grad.addColorStop(0,TH[0]);grad.addColorStop(0.65,TH[1]);grad.addColorStop(1,'#05040c');
+  g.fillStyle=grad;g.fillRect(0,0,VW,VH);
+  if(mode===2){g.fillStyle='rgba(0,0,10,0.45)';g.fillRect(0,0,VW,VH);} // NIGHT low vision
+  // parallax mountains
+  g.fillStyle='rgba(0,0,0,0.5)';
+  const off=(sim.x*0.18)%480;
+  for(let i=-1;i<4;i++){const bx=i*480-off;g.beginPath();g.moveTo(bx,GROUND);g.lineTo(bx+150,GROUND-150);g.lineTo(bx+330,GROUND-40);g.lineTo(bx+480,GROUND);g.fill();}
+  const off2=(sim.x*0.36)%480;
+  g.fillStyle='rgba(0,0,0,0.68)';
+  for(let i=-1;i<4;i++){const bx=i*480-off2;g.beginPath();g.moveTo(bx,GROUND);g.lineTo(bx+180,GROUND-90);g.lineTo(bx+360,GROUND-160);g.lineTo(bx+480,GROUND);g.fill();}
+  // stars
+  g.fillStyle='rgba(255,255,255,0.5)';
+  for(let i=0;i<40;i++){const sx=(i*211+world*97)%VW,sy=(i*97)%220;g.globalAlpha=0.15+((i*13)%10)/40;g.fillRect(sx,sy,1.6,1.6);}
+  g.globalAlpha=1;
+  // beat flash line
+  if(beatFlash>0){g.strokeStyle='rgba(255,255,255,'+(beatFlash*0.06)+')';g.lineWidth=2;g.strokeRect(4,4,VW-8,VH-8);}
   // ground
-  g.fillStyle='#0d0a1f';g.fillRect(0,GY,W,H-GY);
-  // wolf (neon cube-proxy runner; art pass W5+)
-  const bob=wolf.onGround?Math.sin(t*10)*2:0;
-  g.save();g.translate(wolf.x,wolf.y-14+bob);
-  g.shadowColor='#00f0ff';g.shadowBlur=14;
-  g.fillStyle='#0ff';g.fillRect(-14,-14,28,28);
-  g.shadowBlur=0;g.fillStyle='#0a0817';g.fillRect(-6,-8,8,8);g.fillRect(4,-8,6,6);
-  g.fillStyle='#ff2a6d';g.fillRect(-2,4,10,4);g.restore();
-  // wolf ears
-  g.save();g.translate(wolf.x,wolf.y-14+bob);g.fillStyle='#0ff';
-  g.beginPath();g.moveTo(-12,-14);g.lineTo(-6,-26);g.lineTo(-2,-14);g.fill();
-  g.beginPath();g.moveTo(2,-14);g.lineTo(8,-26);g.lineTo(12,-14);g.fill();g.restore();
-  // obstacles = neon data-spikes
-  for(const o of obstacles){g.save();g.shadowColor='#ff2a6d';g.shadowBlur=12;
-    g.fillStyle='#ff2a6d';g.beginPath();g.moveTo(o.x,GY);g.lineTo(o.x+o.w/2,GY-o.h);g.lineTo(o.x+o.w,GY);g.fill();g.restore();}
-  if(!started){g.fillStyle='rgba(10,8,23,.72)';g.fillRect(0,0,W,H);
-    g.fillStyle='#00f0ff';g.font='22px Courier New';g.textAlign='center';
-    g.fillText('PRESS SPACE TO RUN',W/2,H/2);}
-  if(dead){g.fillStyle='rgba(10,8,23,.72)';g.fillRect(0,0,W,H);
-    g.fillStyle='#ff2a6d';g.font='24px Courier New';g.textAlign='center';
-    g.fillText('SYSTEM DOWN — '+Math.floor(score),W/2,H/2-10);
-    g.fillStyle='#cfd6ff';g.font='13px Courier New';
-    g.fillText('SPACE TO REBOOT',W/2,H/2+16);}
+  g.fillStyle='#05040c';g.fillRect(0,GROUND,VW,VH-GROUND);
+  g.strokeStyle=TH[2];g.lineWidth=2;g.globalAlpha=0.85;
+  g.beginPath();g.moveTo(0,GROUND);g.lineTo(VW,GROUND);g.stroke();g.globalAlpha=1;
+  // grid
+  g.strokeStyle='rgba(255,255,255,0.05)';g.lineWidth=1;
+  for(let i=0;i<26;i++){const gx=(i*64-(sim.x%64));g.beginPath();g.moveTo(gx,GROUND);g.lineTo(gx-60,VH);g.stroke();}
+  for(let y=GROUND+16;y<VH;y+=22){g.beginPath();g.moveTo(0,y);g.lineTo(VW,y);g.stroke();}
+  // obstacles
+  for(const o of sim.obs){
+    const ox=o.x-sim.x;
+    if(ox<-100||ox>VW+80)continue;
+    if(o.type==='laser'){
+      g.save();g.shadowColor='#ff2a6d';g.shadowBlur=14;
+      g.fillStyle='rgba(255,42,109,0.9)';g.fillRect(ox,GROUND-78,o.w,10);
+      g.fillStyle='rgba(255,255,255,0.85)';g.fillRect(ox,GROUND-75,o.w,3);
+      g.fillStyle='#ff2a6d';g.fillRect(ox-6,GROUND-92,8,36);g.fillRect(ox+o.w-2,GROUND-92,8,36);
+      g.restore();
+    } else {
+      g.save();g.shadowColor=TH[2];g.shadowBlur=12;
+      g.fillStyle=TH[2];g.globalAlpha=0.92;
+      g.beginPath();g.moveTo(ox,GROUND);g.lineTo(ox+o.w/2,GROUND-o.h);g.lineTo(ox+o.w,GROUND);g.closePath();g.fill();
+      g.globalAlpha=1;g.strokeStyle='#fff';g.lineWidth=1;g.stroke();
+      g.restore();
+    }
+  }
+  // WOLF — neon geometry wolf
+  const w=sim.wolf;
+  const wx=px();
+  g.save();
+  if(shakeT>0){g.translate((Math.random()-0.5)*shakeT,(Math.random()-0.5)*shakeT);}
+  g.translate(wx,w.y);
+  const run=w.onGround()?(Math.sin(now*0.02)*3):0;
+  g.translate(0,run);
+  g.shadowColor=TH[2];g.shadowBlur=16;
+  // body
+  g.fillStyle='#0d1b2e';g.strokeStyle=TH[2];g.lineWidth=2;
+  g.beginPath();g.moveTo(-24,4);g.lineTo(-18,-14);g.lineTo(2,-20);g.lineTo(20,-10);g.lineTo(26,2);g.lineTo(18,10);g.lineTo(-16,10);g.closePath();g.fill();g.stroke();
+  // head
+  g.beginPath();g.moveTo(14,-22);g.lineTo(30,-30);g.lineTo(38,-18);g.lineTo(30,-6);g.lineTo(16,-8);g.closePath();g.fill();g.stroke();
+  // ears
+  g.beginPath();g.moveTo(16,-30);g.lineTo(20,-40);g.lineTo(24,-28);g.closePath();g.fill();g.stroke();
+  g.beginPath();g.moveTo(24,-30);g.lineTo(30,-38);g.lineTo(32,-26);g.closePath();g.fill();g.stroke();
+  // eye
+  g.shadowBlur=8;g.fillStyle='#fff';g.fillRect(26,-24,5,3);
+  // tail
+  g.beginPath();g.moveTo(-24,2);g.lineTo(-40,-8-(w.onGround()?Math.sin(now*0.02)*4:6));g.lineTo(-22,-8);g.closePath();g.fillStyle='#0d1b2e';g.fill();g.stroke();
+  // legs
+  g.strokeStyle=TH[2];g.lineWidth=2.4;
+  const lg=w.onGround()?Math.sin(now*0.025)*6:6;
+  g.beginPath();g.moveTo(-12,8);g.lineTo(-12+lg,20);g.stroke();
+  g.beginPath();g.moveTo(8,8);g.lineTo(8-lg,20);g.stroke();
+  g.restore();
+  // particles on death flash
+  if(flashT>0){g.fillStyle='rgba(255,42,109,'+(flashT/14)+')';g.fillRect(0,0,VW,VH);}
+  // HUD
+  g.fillStyle='rgba(5,4,12,0.72)';roundRect(14,14,236,64,10);g.fill();
+  g.strokeStyle='rgba(255,255,255,0.14)';g.lineWidth=1;g.stroke();
+  g.fillStyle=TH[2];g.font='bold 15px Courier New';
+  g.fillText(L.name,26,38);
+  g.fillStyle='#cfd6ff';g.font='13px Courier New';
+  g.fillText(MODES[mode].split(' ')[0]+' MODE · WORLD '+(world+1),26,58);
+  g.fillStyle='#fff';g.font='bold 17px Courier New';g.textAlign='right';
+  g.fillText(Math.floor(sim.progress)+'%',VW-24,38);
+  g.fillStyle='#7a82b8';g.font='12px Courier New';
+  g.fillText('BEST '+best+'%  ·  WORLDS '+(world+1)+'/3',VW-24,58);
+  g.textAlign='left';
+  // progress bar
+  g.fillStyle='rgba(255,255,255,0.1)';g.fillRect(14,VH-24,VW-28,6);
+  g.fillStyle=TH[2];g.fillRect(14,VH-24,(VW-28)*Math.min(1,sim.progress/100),6);
+  // overlays
+  if(state==='title'){
+    g.fillStyle='rgba(5,4,12,0.8)';g.fillRect(0,0,VW,VH);
+    g.textAlign='center';
+    g.fillStyle=TH[2];g.shadowColor=TH[2];g.shadowBlur=24;
+    g.font='bold 54px Courier New';g.fillText('CYBER WOLF DASH',VW/2,150);
+    g.shadowBlur=0;
+    g.fillStyle='#cfd6ff';g.font='15px Courier New';
+    g.fillText('v0.1 HOWL — a rhythm runner built by the SOETech pack',VW/2,190);
+    g.fillStyle='#7a82b8';g.font='13px Courier New';
+    g.fillText('SPACE / TAP — jump  ·  hold — higher  ·  double-jump as PUP',VW/2,238);
+    g.fillText('survive the beat. reach 100%.',VW/2,262);
+    g.fillStyle='#fff';g.font='bold 19px Courier New';
+    const blink=Math.sin(now*0.005)>0;
+    if(blink)g.fillText('CLICK OR PRESS SPACE TO WAKE THE WOLF',VW/2,330);
+    g.fillStyle='#4a5080';g.font='11px Courier New';
+    g.fillText('zero dependencies · zero cost · SOETech LNM',VW/2,VH-24);
+    g.textAlign='left';
+  }
+  if(state==='dead'){
+    g.fillStyle='rgba(5,4,12,0.66)';g.fillRect(0,0,VW,VH);
+    g.textAlign='center';
+    g.fillStyle='#ff2a6d';g.shadowColor='#ff2a6d';g.shadowBlur=18;
+    g.font='bold 40px Courier New';g.fillText('THE WOLF FALLS',VW/2,200);
+    g.shadowBlur=0;
+    g.fillStyle='#fff';g.font='bold 24px Courier New';
+    g.fillText(Math.floor(sim.progress)+'%  ·  WORLD '+(world+1)+' — '+L.name,VW/2,246);
+    g.fillStyle='#cfd6ff';g.font='14px Courier New';
+    g.fillText('attempt '+attempt+'  ·  best '+best+'%  ·  press SPACE / TAP to run again',VW/2,286);
+    g.fillStyle='#4a5080';g.font='12px Courier New';
+    g.fillText('M to mute · R to restart world 1',VW/2,316);
+    g.textAlign='left';
+  }
 }
-let last=performance.now();
-(function loop(now){const dt=Math.min(0.033,(now-last)/1000);last=now;update(dt);draw();requestAnimationFrame(loop);})(last);
-</script></body></html>
+
+/* ---------- main loop ---------- */
+function loop(now){
+  let dt=(now-lastT)/1000;lastT=now;
+  if(dt>0.1)dt=0.1;
+  acc+=dt;
+  let n=0;
+  while(acc>=STEP&&n<8){simTick();acc-=STEP;n++;}
+  if(shakeT>0)shakeT--;if(flashT>0)flashT--;
+  if(beatFlash>0)beatFlash-=dt*4;
+  draw(now);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------- input ---------- */
+addEventListener('keydown',e=>{
+  if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();if(state==='play'&&!inputHold)queueJump();else queueJump();inputHold=true;}
+  if(e.code==='KeyM'){musicOn=!musicOn;if(musicOn&&state==='play')musicStart();}
+  if(e.code==='KeyR'){world=0;attempt=1;reset();}
+});
+addEventListener('keyup',e=>{if(e.code==='Space'||e.code==='ArrowUp')inputHold=false;});
+cv.addEventListener('pointerdown',e=>{e.preventDefault();queueJump();inputHold=true;});
+addEventListener('pointerup',()=>{inputHold=false;});
+/* world advance on 100% */
+setInterval(()=>{if(state==='play'&&sim.progress>=100){world=(world+1)%LEVEL.length;attempt++;reset();}},300);
+</script>
+</body>
+</html>
