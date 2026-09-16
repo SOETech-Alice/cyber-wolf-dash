@@ -1,0 +1,34 @@
+# Godot 4.x generated/cache files
+.godot/
+*.translation
+
+# Godot export artifacts
+*.tmp
+export.cfg
+export_presets.cfg
+*.exe
+*.apk
+*.dmg
+*.x86_64
+*.pck
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+
+# Python tooling (build scripts)
+__pycache__/
+*.pyc
+.venv/
+
+# Secrets / local env
+.env
+*.env
