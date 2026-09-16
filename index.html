@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cyber Wolf Dash — Pre-Production Prototype</title>
+<style>
+:root{--neon:#00f0ff;--pink:#ff2a6d;--bg:#0a0817}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:#cfd6ff;font-family:'Courier New',monospace;display:flex;flex-direction:column;align-items:center;min-height:100vh;overflow-x:hidden}
+h1{margin:14px 0 4px;font-size:clamp(16px,3vw,26px);letter-spacing:4px;color:var(--neon);text-shadow:0 0 12px rgba(0,240,255,.6)}
+.sub{font-size:11px;color:#7a82b8;letter-spacing:2px;margin-bottom:10px;text-align:center;padding:0 12px}
+#hud{display:flex;gap:22px;font-size:13px;letter-spacing:2px;margin-bottom:8px}
+#hud b{color:var(--pink)}
+canvas{background:#0d0a1f;border:1px solid #2a2f5e;border-radius:6px;touch-action:none;max-width:100vw}
+#help{font-size:11.5px;color:#7a82b8;margin:10px 0 18px;text-align:center;line-height:1.7;padding:0 12px}
+#help b{color:var(--neon)}
+.badge{display:inline-block;border:1px solid #2a2f5e;border-radius:4px;padding:2px 8px;color:#9aa3d8;margin:0 3px}
+</style></head><body>
+<h1>CYBER WOLF DASH</h1>
+<div class="sub">PRE-PRODUCTION PROTOTYPE · W2 CORE MOVEMENT + W3 BEAT CLOCK · SOETECH LNM</div>
+<div id="hud">SCORE <b id="score">0</b>&nbsp;&nbsp;BEST <b id="best">0</b>&nbsp;&nbsp;BPM <b id="bpm">120</b>&nbsp;&nbsp;BEAT <b id="beat">♩</b></div>
+<canvas id="cv" width="960" height="360"></canvas>
+<div id="help"><b>SPACE / CLICK / TAP</b> = jump · <b>hold</b> = higher jump · wolves run on the beat — obstacles spawn on-beat<br>
+<span class="badge">W2</span>runner physics + input buffering + coyote time <span class="badge">W3</span>120 BPM beat clock (pulse = quarter note)</div>
+<script>
+const cv=document.getElementById('cv'),g=cv.getContext('2d');
+const W=cv.width,H=cv.height,GY=H-52;
+const BPM=120, BEAT=60/BPM;                      // W3: quarter-note clock
+let beatT=0,beatN=0,pulse=0;
+const wolf={x:150,y:GY,vy:0,r:16,onGround:true,coyote:0,buffer:0};
+let obstacles=[],speed=300,score=0,best=+(localStorage.getItem('cwd_best')||0),dead=false,t=0,started=false;
+document.getElementById('best').textContent=best;
+function jump(){if(dead){reset();return}started=true;wolf.buffer=6;}          // input buffering W2
+function doJump(){wolf.vy=-560;wolf.onGround=false;wolf.coyote=0;wolf.buffer=0;}
+addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();jump();}});
+cv.addEventListener('pointerdown',e=>{e.preventDefault();jump();});
+function reset(){obstacles=[];speed=300;score=0;dead=false;wolf.y=GY;wolf.vy=0;wolf.onGround=true;started=true;}
+// obstacles spawn ON the beat (W3 foundation)
+function spawnOnBeat(){if(!started||dead)return;
+  if(beatN%2===0&&Math.random()<0.8){const h=[24,32,40][Math.floor(Math.random()*3)];
+    obstacles.push({x:W+30,w:14+Math.random()*18,h,beat:beatN});}
+  if(beatN%8===0&&obstacles.length&&speed<520)speed+=14;}
+function update(dt){t+=dt;
+  if(started&&!dead){
+    beatT+=dt;pulse=Math.max(0,pulse-dt*4);
+    if(beatT>=BEAT){beatT-=BEAT;beatN++;pulse=1;spawnOnBeat();
+      document.getElementById('beat').textContent=beatN%4===0?'♩':'·';}
+    // physics W2: gravity, variable jump hold
+    wolf.vy+=1650*dt;if(!wolf.onGround&&wolf.buffer<=0&&wolf.vy<0)wolf.vy+=1250*dt; // release early = shorter jump
+    wolf.y+=wolf.vy*dt;
+    if(wolf.y>=GY){wolf.y=GY;wolf.vy=0;if(!wolf.onGround)wolf.onGround=true;wolf.coyote=6;}
+    else{if(wolf.onGround){wolf.onGround=false;wolf.coyote=6;}else if(wolf.coyote>0)wolf.coyote-=dt*60;}
+    if(wolf.buffer>0){wolf.buffer-=dt*60;if(wolf.coyote>0&&wolf.buffer>0)doJump();}
+    for(const o of obstacles){o.x-=speed*dt;
+      if(o.x<wolf.x+wolf.r&&o.x+o.w>wolf.x-wolf.r*0.6&&wolf.y>GY-o.h+6){dead=true;
+        best=Math.max(best,Math.floor(score));localStorage.setItem('cwd_best',best);
+        document.getElementById('best').textContent=best;}}
+    obstacles=obstacles.filter(o=>o.x>-40);
+    score+=speed*dt*0.02;document.getElementById('score').textContent=Math.floor(score);
+    document.getElementById('bpm').textContent=BPM;}
+}
+function draw(){
+  g.clearRect(0,0,W,H);
+  // grid floor + beat pulse glow (W3 visual)
+  g.strokeStyle='rgba(42,47,94,'+(0.5+pulse*0.4)+')';g.lineWidth=1;
+  for(let x=-(t*speed%48);x<W;x+=48){g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke();}
+  for(let y=GY;y<H;y+=13){g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke();}
+  g.strokeStyle='rgba(255,42,109,'+(0.55+pulse*0.45)+')';g.lineWidth=2;
+  g.beginPath();g.moveTo(0,GY);g.lineTo(W,GY);g.stroke();
+  // ground
+  g.fillStyle='#0d0a1f';g.fillRect(0,GY,W,H-GY);
+  // wolf (neon cube-proxy runner; art pass W5+)
+  const bob=wolf.onGround?Math.sin(t*10)*2:0;
+  g.save();g.translate(wolf.x,wolf.y-14+bob);
+  g.shadowColor='#00f0ff';g.shadowBlur=14;
+  g.fillStyle='#0ff';g.fillRect(-14,-14,28,28);
+  g.shadowBlur=0;g.fillStyle='#0a0817';g.fillRect(-6,-8,8,8);g.fillRect(4,-8,6,6);
+  g.fillStyle='#ff2a6d';g.fillRect(-2,4,10,4);g.restore();
+  // wolf ears
+  g.save();g.translate(wolf.x,wolf.y-14+bob);g.fillStyle='#0ff';
+  g.beginPath();g.moveTo(-12,-14);g.lineTo(-6,-26);g.lineTo(-2,-14);g.fill();
+  g.beginPath();g.moveTo(2,-14);g.lineTo(8,-26);g.lineTo(12,-14);g.fill();g.restore();
+  // obstacles = neon data-spikes
+  for(const o of obstacles){g.save();g.shadowColor='#ff2a6d';g.shadowBlur=12;
+    g.fillStyle='#ff2a6d';g.beginPath();g.moveTo(o.x,GY);g.lineTo(o.x+o.w/2,GY-o.h);g.lineTo(o.x+o.w,GY);g.fill();g.restore();}
+  if(!started){g.fillStyle='rgba(10,8,23,.72)';g.fillRect(0,0,W,H);
+    g.fillStyle='#00f0ff';g.font='22px Courier New';g.textAlign='center';
+    g.fillText('PRESS SPACE TO RUN',W/2,H/2);}
+  if(dead){g.fillStyle='rgba(10,8,23,.72)';g.fillRect(0,0,W,H);
+    g.fillStyle='#ff2a6d';g.font='24px Courier New';g.textAlign='center';
+    g.fillText('SYSTEM DOWN — '+Math.floor(score),W/2,H/2-10);
+    g.fillStyle='#cfd6ff';g.font='13px Courier New';
+    g.fillText('SPACE TO REBOOT',W/2,H/2+16);}
+}
+let last=performance.now();
+(function loop(now){const dt=Math.min(0.033,(now-last)/1000);last=now;update(dt);draw();requestAnimationFrame(loop);})(last);
+</script></body></html>
