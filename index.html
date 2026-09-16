@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Cyber Wolf Dash — SOETech</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect width=%27100%27 height=%27100%27 fill=%27%2307060f%27/%3E%3Cpolygon points=%2720,80 50,20 80,80%27 fill=%27none%27 stroke=%27%2300f0ff%27 stroke-width=%276%27/%3E%3C/svg%3E">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:#07060f;overflow:hidden;font-family:'Courier New',monospace;-webkit-user-select:none;user-select:none;touch-action:none}
@@ -40,8 +41,12 @@ addEventListener('resize',fit);fit();
 let AC=null,masterGain=null,musicOn=true;
 function audioInit(){
   if(AC)return;
-  AC=new (window.AudioContext||window.webkitAudioContext)();
-  masterGain=AC.createGain();masterGain.gain.value=0.32;masterGain.connect(AC.destination);
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx)return; // no audio support: game runs silent, never crashes
+    AC=new Ctx();
+    masterGain=AC.createGain();masterGain.gain.value=0.32;masterGain.connect(AC.destination);
+  }catch(e){AC=null;}
 }
 function beep(freq,dur,type,vol,slide){
   if(!AC||!musicOn)return;
@@ -117,6 +122,7 @@ function px(){return VW*0.24;} // wolf screen x (rail)
 function reset(){
   sim={x:0,tile:0,wolf:{y:GROUND,vy:0,jumps:0,coyote:0,buffer:0},obs:[],nextSpawn:8,alive:true,progress:0};
   state='play';flashT=0;shakeT=0;
+  if(AC){musicStart();}
 }
 function queueJump(){if(state==='play'){sim.wolf.buffer=4;}else if(state==='dead'){world=0;attempt++;reset();}else if(state==='title'){audioInit();musicStart();reset();}}
 
@@ -147,7 +153,7 @@ function simTick(){
   if(w.buffer>0){
     const maxJ=mode===1?2:1;
     if(w.coyote>0||w.jumps<maxJ&&w.jumps>0){w.vy=JUMP_V*(w.jumps>0?0.9:1);w.jumps++;w.coyote=0;w.buffer=0;beep(520+w.jumps*140,0.09,'square',0.12,880+w.jumps*160);}
-    else if(w.onGround()){w.vy=JUMP_V;w.jumps=1;w.coyote=0;w.buffer=0;beep(520,0.09,'square',0.12,880);}
+    else if(onGround(w)){w.vy=JUMP_V;w.jumps=1;w.coyote=0;w.buffer=0;beep(520,0.09,'square',0.12,880);}
   }
   const gravity=(w.vy<0&&inputHold)?HOLD_G:G;
   w.vy+=gravity*STEP;w.y+=w.vy*STEP;
@@ -178,7 +184,7 @@ function die(){
   best=Math.max(best,p);furthest=Math.max(furthest,world+1);
   localStorage.setItem('cwd_best',best);localStorage.setItem('cwd_furthest',furthest);
 }
-sim.wolf.onGround=function(){return this.y>=GROUND&&this.vy===0;};
+function onGround(w){return w.y>=GROUND&&w.vy===0;}
 
 /* ---------- Rendering ---------- */
 function roundRect(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
@@ -235,7 +241,7 @@ function draw(now){
   g.save();
   if(shakeT>0){g.translate((Math.random()-0.5)*shakeT,(Math.random()-0.5)*shakeT);}
   g.translate(wx,w.y);
-  const run=w.onGround()?(Math.sin(now*0.02)*3):0;
+  const run=onGround(w)?(Math.sin(now*0.02)*3):0;
   g.translate(0,run);
   g.shadowColor=TH[2];g.shadowBlur=16;
   // body
@@ -249,10 +255,10 @@ function draw(now){
   // eye
   g.shadowBlur=8;g.fillStyle='#fff';g.fillRect(26,-24,5,3);
   // tail
-  g.beginPath();g.moveTo(-24,2);g.lineTo(-40,-8-(w.onGround()?Math.sin(now*0.02)*4:6));g.lineTo(-22,-8);g.closePath();g.fillStyle='#0d1b2e';g.fill();g.stroke();
+  g.beginPath();g.moveTo(-24,2);g.lineTo(-40,-8-(onGround(w)?Math.sin(now*0.02)*4:6));g.lineTo(-22,-8);g.closePath();g.fillStyle='#0d1b2e';g.fill();g.stroke();
   // legs
   g.strokeStyle=TH[2];g.lineWidth=2.4;
-  const lg=w.onGround()?Math.sin(now*0.025)*6:6;
+  const lg=onGround(w)?Math.sin(now*0.025)*6:6;
   g.beginPath();g.moveTo(-12,8);g.lineTo(-12+lg,20);g.stroke();
   g.beginPath();g.moveTo(8,8);g.lineTo(8-lg,20);g.stroke();
   g.restore();
